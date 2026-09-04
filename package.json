@@ -1,0 +1,8 @@
+{
+  "name": "interview-prep",
+  "private": true,
+  "scripts": {
+    "check": "node scripts/check.mjs",
+    "dev": "node scripts/serve.mjs"
+  }
+}

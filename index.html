@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex, nofollow" />
+<title>面接想定問答 暗記ノート</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="app">
+
+  <header class="app-header">
+    <h1>面接想定問答 暗記ノート</h1>
+    <p class="app-sub" id="appSub">想定問答ワークシートをもとにした、個人練習用のノートです</p>
+    <label class="deck-switcher">
+      <span class="field-label">問答セット</span>
+      <select id="deckSelect"></select>
+    </label>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="表示モード">
+    <button class="tab-btn is-active" data-mode="study" role="tab" aria-selected="true">暗記モード</button>
+    <button class="tab-btn" data-mode="list" role="tab" aria-selected="false">一覧モード</button>
+    <button class="tab-btn" data-mode="unanswered" role="tab" aria-selected="false">未回答リスト</button>
+    <button class="tab-btn" data-mode="video" role="tab" aria-selected="false" id="tabVideo" hidden>動画</button>
+  </nav>
+
+  <main class="app-main">
+
+    <!-- ===== 暗記モード ===== -->
+    <section id="panel-study" class="panel is-active" data-panel="study">
+
+      <div class="study-toolbar">
+        <label class="field">
+          <span class="field-label">カテゴリ</span>
+          <select id="studyCategory"></select>
+        </label>
+
+        <label class="field field-checkbox">
+          <input type="checkbox" id="studyOnlyUnknown" checked />
+          <span>「覚えた」を除いて出題</span>
+        </label>
+
+        <div class="toolbar-buttons">
+          <button id="btnShuffle" class="btn btn-ghost" type="button">🔀 シャッフル</button>
+          <button id="btnResetProgress" class="btn btn-ghost" type="button">進捗をリセット</button>
+        </div>
+      </div>
+
+      <div class="study-progress">
+        <div class="study-progress-bar"><div id="studyProgressFill" class="study-progress-fill"></div></div>
+        <p id="studyProgressText" class="study-progress-text"></p>
+      </div>
+
+      <div id="studyStage" class="study-stage">
+        <!-- カードはJSで描画 -->
+      </div>
+
+      <div class="study-judge" id="studyJudge">
+        <button id="btnAgain" class="btn btn-again" type="button">
+          <span class="btn-icon">↺</span>もう一度
+        </button>
+        <button id="btnKnown" class="btn btn-known" type="button">
+          <span class="btn-icon">✓</span>覚えた
+        </button>
+      </div>
+
+      <p class="hint">カードをタップすると裏返って回答が表示されます</p>
+    </section>
+
+    <!-- ===== 一覧モード ===== -->
+    <section id="panel-list" class="panel" data-panel="list">
+      <div class="list-toolbar">
+        <button id="btnExpandAll" class="btn btn-ghost btn-small" type="button">すべて開く</button>
+        <button id="btnCollapseAll" class="btn btn-ghost btn-small" type="button">すべて閉じる</button>
+      </div>
+      <div id="listContainer" class="list-container"></div>
+    </section>
+
+    <!-- ===== 未回答リスト ===== -->
+    <section id="panel-unanswered" class="panel" data-panel="unanswered">
+      <p id="unansweredSummary" class="unanswered-summary"></p>
+      <div id="unansweredContainer" class="unanswered-container"></div>
+    </section>
+
+    <!-- ===== 動画 ===== -->
+    <section id="panel-video" class="panel" data-panel="video">
+      <p class="hint">1問ごとの読み上げ動画です。再生ボタンを押すと読み込まれます。</p>
+      <div id="videoContainer" class="video-container"></div>
+    </section>
+
+  </main>
+
+  <footer class="app-footer">
+    <p>このサイトのデータはお使いの端末（ブラウザ）の中だけに保存され、どこにも送信されません。</p>
+  </footer>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
