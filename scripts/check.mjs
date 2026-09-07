@@ -48,6 +48,17 @@ for (const deck of data.decks) {
   for (const category of deck.categories) {
     totalQuestions += category.questions.length;
   }
+
+  if (deck.videoDir) {
+    const questions = deck.categories.flatMap((category) => category.questions);
+    const missingVideos = questions
+      .map((question) => `${String(question.no).padStart(3, '0')}.mp4`)
+      .filter((name) => !existsSync(new URL(`${deck.videoDir}/${name}`, root)));
+    if (missingVideos.length) {
+      console.error(`${deck.id} is missing video(s): ${missingVideos.join(', ')}`);
+      process.exit(1);
+    }
+  }
 }
 
 console.log(`OK: ${data.decks.length} deck(s), ${totalQuestions} question(s) total`);

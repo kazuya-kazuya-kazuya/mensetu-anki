@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "check": "node scripts/check.mjs",
-    "dev": "node scripts/serve.mjs"
+    "dev": "node scripts/serve.mjs",
+    "voicevox:2ji": "node scripts/generate-voicevox-videos.mjs accenture-2ji"
   }
 }

@@ -158,6 +158,7 @@
       if (mode === 'list') renderList();
       if (mode === 'unanswered') renderUnanswered();
       if (mode === 'video') renderVideo();
+      if (mode !== 'video') stopContinuousPlayback(true);
     });
   });
 
@@ -432,12 +433,99 @@
   // ============================================================
 
   const videoContainer = document.getElementById('videoContainer');
+  const continuousPlayBtn = document.getElementById('continuousPlayBtn');
+  const shufflePlayBtn = document.getElementById('shufflePlayBtn');
+  const continuousPlayStatus = document.getElementById('continuousPlayStatus');
+  let continuousPlayback = false;
+  let currentVideoIndex = 0;
+  let playbackMode = null;
+  let playbackQueue = [];
+  let playbackPosition = 0;
+
+  function videoPlayers() {
+    return [...videoContainer.querySelectorAll('.video-player')];
+  }
+
+  function updateContinuousControls(message) {
+    const sequentialActive = continuousPlayback && playbackMode === 'sequential';
+    const shuffleActive = continuousPlayback && playbackMode === 'shuffle';
+    continuousPlayBtn.textContent = sequentialActive ? '■ 連続再生を停止' : '▶ 連続再生';
+    shufflePlayBtn.textContent = shuffleActive ? '■ ランダム再生を停止' : '⤨ ランダム再生';
+    continuousPlayBtn.setAttribute('aria-pressed', sequentialActive ? 'true' : 'false');
+    shufflePlayBtn.setAttribute('aria-pressed', shuffleActive ? 'true' : 'false');
+    continuousPlayStatus.textContent = message || (continuousPlayback
+      ? `${shuffleActive ? 'ランダム再生' : '連続再生'} ${playbackPosition + 1}/${playbackQueue.length} ・ No.${allQuestions[currentVideoIndex]?.no || currentVideoIndex + 1}`
+      : '選択中の問題から順番に再生します');
+  }
+
+  function stopContinuousPlayback(keepPosition) {
+    continuousPlayback = false;
+    playbackMode = null;
+    playbackQueue = [];
+    playbackPosition = 0;
+    const players = videoPlayers();
+    players.forEach((player) => player.pause());
+    if (!keepPosition) currentVideoIndex = 0;
+    videoContainer.querySelectorAll('.video-item').forEach((item) => item.classList.remove('is-playing'));
+    updateContinuousControls();
+  }
+
+  async function playVideoAt(index) {
+    const players = videoPlayers();
+    if (!players.length) return;
+    currentVideoIndex = Math.max(0, Math.min(index, players.length - 1));
+    players.forEach((player, playerIndex) => {
+      if (playerIndex !== currentVideoIndex) player.pause();
+    });
+    const player = players[currentVideoIndex];
+    player.closest('.video-item').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    try {
+      await player.play();
+      updateContinuousControls();
+    } catch (error) {
+      continuousPlayback = false;
+      updateContinuousControls('再生ボタンを押してから、もう一度お試しください');
+    }
+  }
+
+  continuousPlayBtn.addEventListener('click', () => {
+    if (continuousPlayback && playbackMode === 'sequential') {
+      stopContinuousPlayback(true);
+      return;
+    }
+    continuousPlayback = true;
+    playbackMode = 'sequential';
+    playbackQueue = Array.from({ length: allQuestions.length - currentVideoIndex }, (_, index) => currentVideoIndex + index);
+    playbackPosition = 0;
+    playVideoAt(playbackQueue[playbackPosition]);
+  });
+
+  shufflePlayBtn.addEventListener('click', () => {
+    if (continuousPlayback && playbackMode === 'shuffle') {
+      stopContinuousPlayback(true);
+      return;
+    }
+    continuousPlayback = true;
+    playbackMode = 'shuffle';
+    playbackQueue = Array.from({ length: allQuestions.length }, (_, index) => index);
+    shuffleArray(playbackQueue);
+    playbackPosition = 0;
+    playVideoAt(playbackQueue[playbackPosition]);
+  });
 
   function renderVideo() {
+    stopContinuousPlayback(false);
     videoContainer.innerHTML = '';
     if (!currentDeck.videoDir) return;
 
-    allQuestions.forEach((q) => {
+    if (currentDeck.voiceCredit) {
+      const credit = document.createElement('p');
+      credit.className = 'voice-credit';
+      credit.textContent = `音声：${currentDeck.voiceCredit}`;
+      videoContainer.appendChild(credit);
+    }
+
+    allQuestions.forEach((q, index) => {
       const no = String(q.no).padStart(3, '0');
       const src = `${currentDeck.videoDir}/${no}.mp4`;
 
@@ -448,6 +536,34 @@
         <video class="video-player" controls preload="none" src="${escapeHtml(src)}"></video>
       `;
       videoContainer.appendChild(item);
+
+      const player = item.querySelector('.video-player');
+      player.addEventListener('play', () => {
+        currentVideoIndex = index;
+        videoPlayers().forEach((other, otherIndex) => {
+          if (otherIndex !== index) other.pause();
+        });
+        videoContainer.querySelectorAll('.video-item').forEach((other) => other.classList.remove('is-playing'));
+        item.classList.add('is-playing');
+        if (continuousPlayback) updateContinuousControls();
+      });
+      player.addEventListener('pause', () => item.classList.remove('is-playing'));
+      player.addEventListener('ended', () => {
+        item.classList.remove('is-playing');
+        if (!continuousPlayback) return;
+        playbackPosition += 1;
+        if (playbackPosition < playbackQueue.length) {
+          playVideoAt(playbackQueue[playbackPosition]);
+        } else {
+          continuousPlayback = false;
+          const completedMode = playbackMode;
+          playbackMode = null;
+          playbackQueue = [];
+          playbackPosition = 0;
+          currentVideoIndex = 0;
+          updateContinuousControls(completedMode === 'shuffle' ? '全問のランダム再生が完了しました' : '全問の連続再生が完了しました');
+        }
+      });
     });
   }
 

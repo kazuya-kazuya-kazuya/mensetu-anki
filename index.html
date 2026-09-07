@@ -87,6 +87,11 @@
     <!-- ===== 動画 ===== -->
     <section id="panel-video" class="panel" data-panel="video">
       <p class="hint">1問ごとの読み上げ動画です。再生ボタンを押すと読み込まれます。</p>
+      <div class="video-playback-controls" aria-label="動画の再生方法">
+        <button id="continuousPlayBtn" class="btn btn-primary" type="button">▶ 連続再生</button>
+        <button id="shufflePlayBtn" class="btn" type="button">⤨ ランダム再生</button>
+        <p id="continuousPlayStatus" class="video-playback-status" aria-live="polite">先頭の問題から順番に再生します</p>
+      </div>
       <div id="videoContainer" class="video-container"></div>
     </section>
 

@@ -1288,7 +1288,9 @@ window.QA_DATA = {
             }
           ]
         }
-      ]
+      ],
+      "videoDir": "videos/accenture-2ji",
+      "voiceCredit": "VOICEVOX:青山龍星"
     }
   ]
 };

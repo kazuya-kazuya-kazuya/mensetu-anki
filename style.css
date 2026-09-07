@@ -625,6 +625,40 @@ body {
 }
 
 /* ---------- 動画 ---------- */
+.video-playback-controls {
+  position: sticky;
+  top: 8px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 14px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--paper) 90%, transparent);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+}
+
+.video-playback-status {
+  flex: 1;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+}
+
+.video-item.is-playing {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent), var(--shadow);
+}
+
+.voice-credit {
+  margin: 0 0 1rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-align: right;
+}
 
 .video-container {
   display: flex;
@@ -698,6 +732,11 @@ body {
 
   .toolbar-buttons .btn {
     flex: 1;
+  }
+
+  .video-playback-controls {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .field select {
