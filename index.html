@@ -24,6 +24,7 @@
     <button class="tab-btn" data-mode="list" role="tab" aria-selected="false">一覧モード</button>
     <button class="tab-btn" data-mode="unanswered" role="tab" aria-selected="false">未回答リスト</button>
     <button class="tab-btn" data-mode="video" role="tab" aria-selected="false" id="tabVideo" hidden>動画</button>
+    <button class="tab-btn" data-mode="listen" role="tab" aria-selected="false">聞き流し</button>
   </nav>
 
   <main class="app-main">
@@ -82,6 +83,32 @@
     <section id="panel-unanswered" class="panel" data-panel="unanswered">
       <p id="unansweredSummary" class="unanswered-summary"></p>
       <div id="unansweredContainer" class="unanswered-container"></div>
+    </section>
+
+    <section id="panel-listen" class="panel" data-panel="listen">
+      <h2>耳で繰り返す面接練習</h2>
+      <p class="hint">質問 → 考える時間 → 回答の順に自動再生。二次面接対策は補足も聞けます。</p>
+      <div class="listen-settings">
+        <label class="field">再生順<select id="listenOrder"><option value="sequential">問題順</option><option value="shuffle">ランダム</option></select></label>
+        <label class="field">速度<select id="listenSpeed"><option value="0.75">0.75倍</option><option value="1" selected>1倍</option><option value="1.25">1.25倍</option><option value="1.5">1.5倍</option><option value="2">2倍</option></select></label>
+        <label class="field">繰り返し<select id="listenRepeat"><option value="all">全問を繰り返す</option><option value="one">同じ問題を繰り返す</option><option value="off">1周で終了</option></select></label>
+        <label class="field">自動停止<select id="listenTimer"><option value="0">なし</option><option value="15">15分後</option><option value="30">30分後</option><option value="60">60分後</option></select></label>
+        <label class="field field-checkbox"><input id="listenUnknown" type="checkbox" />「覚えた」を除く</label>
+      </div>
+      <div class="listen-card">
+        <p id="listenStatus" role="status"></p>
+        <label class="field">聞き始める問題<select id="listenQuestion"></select></label>
+        <h3 id="listenTitle"></h3>
+        <audio id="listenAudio" controls preload="none" aria-label="聞き流しプレーヤー"></audio>
+        <div class="listen-buttons">
+          <button id="listenPrev" class="btn" type="button">前の問題</button>
+          <button id="listenPlay" class="btn btn-known" type="button">▶ 聞き流しを開始</button>
+          <button id="listenNext" class="btn" type="button">次の問題</button>
+        </div>
+        <details><summary>回答・補足を見る</summary><p id="listenAnswer"></p><p id="listenPoint"></p></details>
+      </div>
+      <p id="listenCredit" class="voice-credit"></p>
+      <p class="hint">音声のある問答セットで利用できます。画面ロック中の継続再生は端末・ブラウザにより異なります。</p>
     </section>
 
     <!-- ===== 動画 ===== -->

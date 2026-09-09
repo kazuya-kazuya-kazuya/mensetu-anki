@@ -58,6 +58,11 @@ for (const deck of data.decks) {
       console.error(`${deck.id} is missing video(s): ${missingVideos.join(', ')}`);
       process.exit(1);
     }
+    const missingAudio = questions.filter(q => !existsSync(new URL(`${deck.videoDir}/audio/${String(q.no).padStart(3, '0')}.m4a`, root)));
+    if (missingAudio.length) {
+      console.error(`${deck.id} is missing listening audio. Run npm run audio:extract.`);
+      process.exit(1);
+    }
   }
 }
 

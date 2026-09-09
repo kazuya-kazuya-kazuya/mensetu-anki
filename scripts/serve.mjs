@@ -10,6 +10,7 @@ const MIME = {
   '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.mp4': 'video/mp4',
+  '.m4a': 'audio/mp4',
   '.json': 'application/json; charset=utf-8',
 };
 

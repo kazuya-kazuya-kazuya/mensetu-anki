@@ -5,6 +5,7 @@ import vm from 'node:vm';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const DECK_ID = process.argv[2] || 'accenture-2ji';
+if (!/^[a-zA-Z0-9_-]+$/.test(DECK_ID)) throw new Error('Invalid deck ID');
 const SPEAKER_ID = 13; // 青山龍星・ノーマル
 const VOICEVOX = process.env.VOICEVOX_URL || 'http://127.0.0.1:50021';
 const THINK_SECONDS = 3;
@@ -92,6 +93,7 @@ try {
 
   for (let index = 0; index < questions.length; index += 1) {
     const item = questions[index];
+    const answerText = item.point ? `${item.answer}\n\n補足：\n${item.point}` : item.answer;
     const no = String(item.no || index + 1).padStart(3, '0');
     const questionWav = join(workDir, `${no}-question.wav`);
     const answerWav = join(workDir, `${no}-answer.wav`);
@@ -99,12 +101,12 @@ try {
     const outputPath = join(outputDir, `${no}.mp4`);
     process.stdout.write(`[${index + 1}/${questions.length}] Q${item.no} 音声生成... `);
     await speak(`質問です。${item.question}`, questionWav);
-    await speak(`回答例です。${item.answer}`, answerWav);
+    await speak(`回答例です。${answerText}`, answerWav);
     const questionDuration = duration(questionWav);
     const answerDuration = duration(answerWav);
     const answerStart = questionDuration + THINK_SECONDS;
     const total = answerStart + answerDuration;
-    writeFileSync(assPath, assDocument(item.question, item.answer, item.no, answerStart, total), 'utf8');
+    writeFileSync(assPath, assDocument(item.question, answerText, item.no, answerStart, total), 'utf8');
 
     run('ffmpeg', [
       '-y', '-loglevel', 'error',

@@ -4,6 +4,7 @@
   "scripts": {
     "check": "node scripts/check.mjs",
     "dev": "node scripts/serve.mjs",
-    "voicevox:2ji": "node scripts/generate-voicevox-videos.mjs accenture-2ji"
+    "voicevox:2ji": "node scripts/generate-voicevox-videos.mjs accenture-2ji",
+    "audio:extract": "node scripts/extract-listening-audio.mjs"
   }
 }

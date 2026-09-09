@@ -17,7 +17,7 @@ try {
         $ns = [System.Xml.XmlNamespaceManager]::new($doc.NameTable)
         $ns.AddNamespace('x', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main')
         foreach ($item in $doc.SelectNodes('//x:si', $ns)) {
-            $parts = $item.SelectNodes('.//x:t', $ns) | ForEach-Object { $_.'#text' }
+            $parts = $item.SelectNodes('./x:t | ./x:r/x:t', $ns) | ForEach-Object { $_.'#text' }
             $shared += ($parts -join '')
         }
     }
@@ -43,7 +43,7 @@ try {
                 $ref = $cell.r
                 $type = $cell.t
                 if ($type -eq 'inlineStr') {
-                    $value = (($cell.SelectNodes('.//x:t', $sheetNs) | ForEach-Object { $_.'#text' }) -join '')
+                    $value = (($cell.SelectNodes('./x:is/x:t | ./x:is/x:r/x:t', $sheetNs) | ForEach-Object { $_.'#text' }) -join '')
                 } else {
                     $value = $cell.v
                     if ($type -eq 's' -and $null -ne $value) { $value = $shared[[int]$value] }

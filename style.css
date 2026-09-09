@@ -689,6 +689,18 @@ body {
 }
 
 /* ---------- フッター ---------- */
+.tabs { flex-wrap: wrap; border-radius: 18px; }
+.listen-settings, .listen-buttons { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.listen-settings .field { flex: 1 1 180px; }
+.listen-card { padding: 20px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+.listen-card audio { width: 100%; margin: 12px 0; }
+.listen-card select { width: 100%; min-width: 0; max-width: 100%; }
+.listen-card .field { display: block; }
+.listen-buttons .btn { flex: 1 1 auto; min-height: 48px; }
+#listenAnswer, #listenPoint, #listenTitle { white-space: pre-wrap; overflow-wrap: anywhere; }
+#listenPoint { color: var(--ink-soft); }
+.listen-card summary { cursor: pointer; }
+.btn:disabled { opacity: 0.5; cursor: default; }
 
 .app-footer {
   margin-top: 30px;

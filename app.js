@@ -88,6 +88,9 @@
     const deck = DECKS.find((d) => d.id === deckId) || DECKS[0];
     if (!deck) return;
 
+    stopContinuousPlayback(false);
+    listenAudio.pause();
+    clearListenTimer();
     currentDeck = deck;
     loadDeckData(deck);
     progress = loadProgress(deck.id);
@@ -120,6 +123,7 @@
       panels.forEach((p) => p.classList.toggle('is-active', p.dataset.panel === 'study'));
     }
     if (currentDeck.videoDir) renderVideo();
+    rebuildListening();
   }
 
   // ---------- デッキ切り替えUI ----------
@@ -158,7 +162,9 @@
       if (mode === 'list') renderList();
       if (mode === 'unanswered') renderUnanswered();
       if (mode === 'video') renderVideo();
+      if (mode === 'listen' && listenUnknown.checked) rebuildListening();
       if (mode !== 'video') stopContinuousPlayback(true);
+      if (mode !== 'listen') listenAudio.pause();
     });
   });
 
@@ -517,6 +523,12 @@
     stopContinuousPlayback(false);
     videoContainer.innerHTML = '';
     if (!currentDeck.videoDir) return;
+    if (currentDeck.videoNotice) {
+      const notice = document.createElement('p');
+      notice.className = 'voice-credit';
+      notice.textContent = currentDeck.videoNotice;
+      videoContainer.appendChild(notice);
+    }
 
     if (currentDeck.voiceCredit) {
       const credit = document.createElement('p');
@@ -527,7 +539,7 @@
 
     allQuestions.forEach((q, index) => {
       const no = String(q.no).padStart(3, '0');
-      const src = `${currentDeck.videoDir}/${no}.mp4`;
+      const src = `${currentDeck.videoDir}/${no}.mp4${currentDeck.videoVersion ? `?v=${encodeURIComponent(currentDeck.videoVersion)}` : ''}`;
 
       const item = document.createElement('div');
       item.className = 'video-item';
@@ -539,6 +551,7 @@
 
       const player = item.querySelector('.video-player');
       player.addEventListener('play', () => {
+        listenAudio.pause();
         currentVideoIndex = index;
         videoPlayers().forEach((other, otherIndex) => {
           if (otherIndex !== index) other.pause();
@@ -564,6 +577,162 @@
           updateContinuousControls(completedMode === 'shuffle' ? '全問のランダム再生が完了しました' : '全問の連続再生が完了しました');
         }
       });
+    });
+  }
+
+  // ---------- 聞き流し：同じaudio要素で次の問題へ進む ----------
+  const listenAudio = document.getElementById('listenAudio');
+  const listenOrder = document.getElementById('listenOrder');
+  const listenSpeed = document.getElementById('listenSpeed');
+  const listenRepeat = document.getElementById('listenRepeat');
+  const listenTimer = document.getElementById('listenTimer');
+  const listenUnknown = document.getElementById('listenUnknown');
+  const listenQuestion = document.getElementById('listenQuestion');
+  const listenPlay = document.getElementById('listenPlay');
+  const listenPrev = document.getElementById('listenPrev');
+  const listenNext = document.getElementById('listenNext');
+  const listenStatus = document.getElementById('listenStatus');
+  let listenQueue = [];
+  let listenIndex = 0;
+  let listenDeadline = 0;
+  let listenTimeout = null;
+  let listenGeneration = 0;
+
+  function clearListenTimer() {
+    clearTimeout(listenTimeout);
+    listenDeadline = 0;
+    listenTimeout = null;
+  }
+
+  function expireListening() {
+    listenAudio.pause();
+    clearListenTimer();
+    listenStatus.textContent = '設定した時間になったので停止しました';
+  }
+
+  function armListenTimer() {
+    clearListenTimer();
+    const delay = Number(listenTimer.value) * 60000;
+    if (delay) {
+      listenDeadline = Date.now() + delay;
+      listenTimeout = setTimeout(expireListening, delay);
+    }
+  }
+
+  function rebuildListening() {
+    listenAudio.pause();
+    clearListenTimer();
+    listenQueue = currentDeck.videoDir ? answeredQuestions.filter(q => !listenUnknown.checked || progress[q.id] !== 'known') : [];
+    if (listenOrder.value === 'shuffle') shuffleArray(listenQueue);
+    listenIndex = 0;
+    listenQuestion.replaceChildren();
+    listenQueue.forEach((q, index) => {
+      const option = document.createElement('option');
+      option.value = index;
+      option.textContent = `No.${q.no} ${q.question}`;
+      listenQuestion.appendChild(option);
+    });
+    [listenPlay, listenPrev, listenNext, listenQuestion].forEach(el => { el.disabled = !listenQueue.length; });
+    document.getElementById('listenCredit').textContent = currentDeck.voiceCredit ? `音声：${currentDeck.voiceCredit}` : '';
+    loadListenTrack();
+  }
+
+  function loadListenTrack() {
+    listenGeneration += 1;
+    listenAudio.pause();
+    const q = listenQueue[listenIndex];
+    if (!q) {
+      listenAudio.removeAttribute('src');
+      listenAudio.load();
+      listenStatus.textContent = currentDeck.videoDir ? '再生対象がありません。「覚えた」を除く設定を外してください。' : 'この問答セットには音声がありません。二次面接対策などを選んでください。';
+      ['listenTitle', 'listenAnswer', 'listenPoint'].forEach(id => { document.getElementById(id).textContent = ''; });
+      return;
+    }
+    listenQuestion.value = String(listenIndex);
+    listenStatus.textContent = `${listenIndex + 1} / ${listenQueue.length}問`;
+    document.getElementById('listenTitle').textContent = `No.${q.no} ${q.question}`;
+    document.getElementById('listenAnswer').textContent = q.answer;
+    document.getElementById('listenPoint').textContent = q.point ? `補足：${q.point}` : '';
+    listenAudio.src = `${currentDeck.videoDir}/audio/${String(q.no).padStart(3, '0')}.m4a?v=${encodeURIComponent(currentDeck.videoVersion || '1')}`;
+    listenAudio.playbackRate = Number(listenSpeed.value);
+    if ('mediaSession' in navigator && 'MediaMetadata' in window) {
+      navigator.mediaSession.metadata = new MediaMetadata({ title: `No.${q.no} ${q.question}`, artist: currentDeck.label });
+    }
+  }
+
+  async function startListening() {
+    if (!listenQueue.length) return;
+    if (listenDeadline && Date.now() >= listenDeadline) { expireListening(); return; }
+    stopContinuousPlayback(true);
+    if (listenAudio.error) listenAudio.load();
+    if (!listenDeadline) armListenTimer();
+    const generation = listenGeneration;
+    try { await listenAudio.play(); }
+    catch (error) {
+      if (generation === listenGeneration && error.name !== 'AbortError') {
+        listenStatus.textContent = '再生できませんでした。通信状態を確認して再生ボタンを押してください。';
+      }
+    }
+  }
+
+  function moveListening(direction, automatic = false) {
+    if (!listenQueue.length) return;
+    if (listenDeadline && Date.now() >= listenDeadline) { expireListening(); return; }
+    if (automatic && listenRepeat.value === 'one') {
+      listenAudio.currentTime = 0;
+      startListening();
+      return;
+    }
+    const next = listenIndex + direction;
+    if (automatic && next >= listenQueue.length && listenRepeat.value === 'off') {
+      listenAudio.pause();
+      clearListenTimer();
+      listenStatus.textContent = '全問の再生が完了しました';
+      return;
+    }
+    if (next >= listenQueue.length && listenOrder.value === 'shuffle') {
+      const last = listenQueue[listenIndex];
+      shuffleArray(listenQueue);
+      if (listenQueue.length > 1 && listenQueue[0] === last) [listenQueue[0], listenQueue[1]] = [listenQueue[1], listenQueue[0]];
+      listenQueue.forEach((q, i) => { listenQuestion.options[i].textContent = `No.${q.no} ${q.question}`; });
+    }
+    listenIndex = (next + listenQueue.length) % listenQueue.length;
+    loadListenTrack();
+    startListening();
+  }
+
+  listenPlay.addEventListener('click', () => { if (listenAudio.paused) startListening(); else listenAudio.pause(); });
+  listenPrev.addEventListener('click', () => moveListening(-1));
+  listenNext.addEventListener('click', () => moveListening(1));
+  listenQuestion.addEventListener('change', () => { listenIndex = Number(listenQuestion.value); loadListenTrack(); startListening(); });
+  listenOrder.addEventListener('change', rebuildListening);
+  listenUnknown.addEventListener('change', rebuildListening);
+  listenSpeed.addEventListener('change', () => { listenAudio.playbackRate = Number(listenSpeed.value); });
+  listenTimer.addEventListener('change', () => { clearListenTimer(); if (!listenAudio.paused) armListenTimer(); });
+  listenAudio.addEventListener('ended', () => moveListening(1, true));
+  listenAudio.addEventListener('play', () => {
+    if (listenDeadline && Date.now() >= listenDeadline) { expireListening(); return; }
+    stopContinuousPlayback(true);
+    if (!listenDeadline) armListenTimer();
+    listenPlay.textContent = 'Ⅱ 一時停止';
+    listenStatus.textContent = `${listenIndex + 1} / ${listenQueue.length}問 ・ 再生中`;
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+  });
+  listenAudio.addEventListener('pause', () => {
+    listenPlay.textContent = '▶ 再生';
+    if (listenStatus.textContent.includes('再生中')) listenStatus.textContent = `${listenIndex + 1} / ${listenQueue.length}問 ・ 一時停止中`;
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+  });
+  listenAudio.addEventListener('error', () => {
+    if (listenAudio.hasAttribute('src')) listenStatus.textContent = '音声を読み込めませんでした。通信状態を確認して再生し直してください。';
+  });
+  listenAudio.addEventListener('timeupdate', () => {
+    if (listenDeadline && Date.now() >= listenDeadline) expireListening();
+  });
+  if ('mediaSession' in navigator) {
+    const handlers = { play: startListening, pause: () => listenAudio.pause(), previoustrack: () => moveListening(-1), nexttrack: () => moveListening(1) };
+    Object.entries(handlers).forEach(([action, handler]) => {
+      try { navigator.mediaSession.setActionHandler(action, handler); } catch (_) { /* 非対応端末 */ }
     });
   }
 
