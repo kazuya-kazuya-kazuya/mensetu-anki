@@ -42,6 +42,8 @@
           <span class="field-label">学習方法</span>
           <select id="studyMode"><option value="due">今日の復習・未学習</option><option value="free">自由に練習</option></select>
         </label>
+        <label class="field"><span class="field-label">覚え方</span><select id="recallMode"><option value="card">質問から回答を思い出す</option><option value="words">ワード穴埋めで覚える</option></select></label>
+        <label class="field" id="wordLevelField" hidden><span class="field-label">隠す量</span><select id="wordLevel"><option value="light">少なめ</option><option value="medium">半分くらい</option><option value="all">多め</option><option value="custom">自分で選んだワード</option></select></label>
         <label class="field field-checkbox">
           <input type="checkbox" id="studyOnlyUnknown" checked />
           <span>自由練習では「覚えた」を除く</span>

@@ -217,6 +217,94 @@
   const reviewSummary = document.getElementById('reviewSummary');
   const reviewFeedback = document.getElementById('reviewFeedback');
   const btnUndoReview = document.getElementById('btnUndoReview');
+  const recallMode = document.getElementById('recallMode');
+  const wordLevel = document.getElementById('wordLevel');
+  const WORD_KEY = 'mensetsu-anki:words:v1:';
+
+  function answerWords(answer) {
+    if (typeof Intl.Segmenter === 'function') {
+      return Array.from(new Intl.Segmenter('ja', { granularity: 'word' }).segment(answer), item => ({ text: item.segment, candidate: !!item.isWordLike && /[\p{Script=Han}\p{Script=Katakana}A-Za-z0-9０-９]/u.test(item.segment) }));
+    }
+    return (answer.match(/[一-龯々ぁ-んァ-ヶーA-Za-z0-9０-９]+|[^一-龯々ぁ-んァ-ヶーA-Za-z0-9０-９]+/g) || []).map(text => ({ text, candidate: /[一-龯々ァ-ヶA-Za-z0-9０-９]/.test(text) }));
+  }
+
+  function renderWordPractice(q) {
+    const words = answerWords(q.answer);
+    let candidates = words.flatMap((w, i) => w.candidate ? [i] : []);
+    if (!candidates.length) candidates = words.flatMap((w, i) => w.text.trim() ? [i] : []);
+    let saved = null;
+    try {
+      const record = JSON.parse(localStorage.getItem(WORD_KEY + currentDeck.id + ':' + q.id) || 'null');
+      if (record?.answer === q.answer && Array.isArray(record.indices)) saved = record.indices.filter(i => candidates.includes(i));
+    } catch (_) { /* 保存が使えない場合も練習可能 */ }
+    let selected = new Set(wordLevel.value === 'custom' && saved ? saved : candidates.filter((_, i) => i % (wordLevel.value === 'all' ? 1 : wordLevel.value === 'medium' ? 2 : 3) === 0));
+    const revealed = new Set(studyState.flipped ? selected : []);
+    studyStage.innerHTML = `<section class="word-card" aria-label="ワード穴埋め練習">
+      <div class="flash-meta"><span>${escapeHtml(q.categoryName)}</span><span>No.${escapeHtml(q.no)}</span></div>
+      <h2 class="word-question">${escapeHtml(q.question)}</h2>
+      <p class="hint">空欄の言葉を声に出して思い出し、タップして確認しましょう。</p>
+      <p id="wordStatus" role="status"></p><div id="wordAnswer" class="word-answer"></div>
+      <div class="word-actions"><button type="button" class="btn" id="wordHint">1ワードだけ見る</button><button type="button" class="btn" id="wordReveal">すべて答え合わせ</button><button type="button" class="btn btn-ghost" id="wordRetry">もう一度隠す</button></div>
+      <p id="wordPoint" class="flash-point" hidden></p>
+      <details class="word-editor"><summary>隠すワードを自分で選ぶ（回答を表示）</summary><p class="hint">隠したい言葉を選択してください。選択内容はこの端末に保存します。</p><div id="wordChoices" class="word-choices"></div><p id="wordSaveStatus" role="status"></p></details>
+    </section>`;
+    const answer = document.getElementById('wordAnswer');
+    const sync = () => {
+      const remaining = [...selected].filter(i => !revealed.has(i)).length;
+      studyState.flipped = remaining === 0 && selected.size > 0;
+      [btnAgain, btnHard, btnKnown].forEach(btn => { btn.disabled = !studyState.flipped; });
+      document.getElementById('wordStatus').textContent = selected.size ? `確認済み ${selected.size - remaining} / ${selected.size}ワード${remaining ? '' : ' ・ 回答全体を振り返って評価してください'}` : '隠すワードを1つ以上選んでください';
+      document.getElementById('wordHint').disabled = remaining === 0;
+      document.getElementById('wordReveal').disabled = remaining === 0;
+      const point = document.getElementById('wordPoint');
+      point.hidden = !studyState.flipped || !q.point;
+      point.textContent = q.point ? `補足：${q.point}` : '';
+    };
+    const draw = () => {
+      answer.replaceChildren();
+      words.forEach((word, i) => {
+        if (!selected.has(i)) { answer.append(document.createTextNode(word.text)); return; }
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'word-blank' + (revealed.has(i) ? ' is-revealed' : '');
+        button.textContent = revealed.has(i) ? word.text : '［　？　］';
+        button.setAttribute('aria-label', revealed.has(i) ? `答え：${word.text}` : `空欄${[...selected].sort((a,b)=>a-b).indexOf(i) + 1}の答えを見る`);
+        button.addEventListener('click', () => { revealed.add(i); draw(); answer.querySelectorAll('.word-blank')[[...selected].sort((a,b)=>a-b).indexOf(i)]?.focus({ preventScroll: true }); });
+        answer.append(button);
+      });
+      sync();
+    };
+    document.getElementById('wordHint').addEventListener('click', () => { const i = [...selected].find(i => !revealed.has(i)); if (i !== undefined) revealed.add(i); draw(); });
+    document.getElementById('wordReveal').addEventListener('click', () => { selected.forEach(i => revealed.add(i)); draw(); });
+    document.getElementById('wordRetry').addEventListener('click', () => { revealed.clear(); draw(); });
+    const choices = document.getElementById('wordChoices');
+    words.forEach((word, i) => {
+      if (!candidates.includes(i)) { choices.append(document.createTextNode(word.text)); return; }
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'word-choice';
+      button.textContent = word.text;
+      button.setAttribute('aria-pressed', String(selected.has(i)));
+      button.addEventListener('click', () => {
+        if (selected.has(i)) selected.delete(i); else selected.add(i);
+        button.setAttribute('aria-pressed', String(selected.has(i)));
+        wordLevel.value = 'custom';
+        revealed.clear();
+        try { localStorage.setItem(WORD_KEY + currentDeck.id + ':' + q.id, JSON.stringify({ answer: q.answer, indices: [...selected].sort((a,b)=>a-b) })); document.getElementById('wordSaveStatus').textContent = '選択したワードを保存しました'; }
+        catch (_) { document.getElementById('wordSaveStatus').textContent = '保存できませんでした。この画面では練習を続けられます。'; }
+        draw();
+      });
+      choices.append(button);
+    });
+    draw();
+  }
+
+  recallMode.addEventListener('change', () => {
+    document.getElementById('wordLevelField').hidden = recallMode.value !== 'words';
+    studyState.flipped = false;
+    renderStudy();
+  });
+  wordLevel.addEventListener('change', () => { studyState.flipped = false; renderStudy(); });
 
   // カテゴリ選択肢を用意（回答が1件も無いカテゴリは暗記対象が無いため注記を付ける）
   function rebuildStudyCategoryOptions() {
@@ -309,6 +397,8 @@
     studyJudge.style.visibility = 'visible';
     const id = studyState.deck[0];
     const q = questionById.get(id);
+
+    if (recallMode.value === 'words') { renderWordPractice(q); return; }
 
     studyStage.innerHTML = `
       <div class="flash-card ${studyState.flipped ? 'is-flipped' : ''}" id="flashCard" role="button" tabindex="0" aria-label="タップして裏返す">
