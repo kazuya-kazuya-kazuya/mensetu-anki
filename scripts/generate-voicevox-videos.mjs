@@ -16,6 +16,8 @@ const deck = sandbox.window.QA_DATA.decks.find((item) => item.id === DECK_ID);
 if (!deck) throw new Error(`Deck not found: ${DECK_ID}`);
 
 const questions = deck.categories.flatMap((category) => category.questions);
+const requestedNumbers = process.argv.slice(3);
+if (requestedNumbers.some(no => !questions.some(q => String(q.no) === no))) throw new Error('Unknown question number');
 const outputDir = join(ROOT, 'videos', DECK_ID);
 const workDir = join(ROOT, '.voicevox-build', DECK_ID);
 mkdirSync(outputDir, { recursive: true });
@@ -93,6 +95,7 @@ try {
 
   for (let index = 0; index < questions.length; index += 1) {
     const item = questions[index];
+    if (requestedNumbers.length && !requestedNumbers.includes(String(item.no))) continue;
     const answerText = item.point ? `${item.answer}\n\n補足：\n${item.point}` : item.answer;
     const no = String(item.no || index + 1).padStart(3, '0');
     const questionWav = join(workDir, `${no}-question.wav`);
@@ -126,4 +129,4 @@ try {
   rmSync(workDir, { recursive: true, force: true });
 }
 
-console.log(`Generated ${questions.length} videos with VOICEVOX speaker ${SPEAKER_ID}: ${outputDir}`);
+console.log(`Generated ${requestedNumbers.length || questions.length} videos with VOICEVOX speaker ${SPEAKER_ID}: ${outputDir}`);
