@@ -57,7 +57,7 @@ try {
   await page.selectOption('#deckSelect', 'accenture-2ji');
   await page.selectOption('#studyMode', 'due');
   assert.match(await page.textContent('#studyProgressText'), /覚えた 1/);
-  assert.match(await page.textContent('#reviewSummary'), /初回確認 24/);
+  assert.ok((await page.textContent('#reviewSummary')).includes(`初回確認 ${ids.length}`));
   await page.click('#flashCard');
   await page.screenshot({ path: '.vercel/review-mobile.png', fullPage: true });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
