@@ -50,6 +50,7 @@
 * {
   box-sizing: border-box;
 }
+[hidden] { display: none !important; }
 
 html,
 body {
@@ -689,6 +690,13 @@ body {
 }
 
 /* ---------- フッター ---------- */
+.review-summary { font-weight: 700; color: var(--accent-strong); }
+.review-help { margin-top: 16px; font-size: .85rem; color: var(--ink-soft); }
+.study-judge { flex-wrap: wrap; }
+.study-judge .btn { flex: 1 1 130px; }
+#btnHard { order: 1; }
+#btnKnown { order: 2; }
+#reviewFeedback { min-height: 1.75em; }
 .tabs { flex-wrap: wrap; border-radius: 18px; }
 .listen-settings, .listen-buttons { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
 .listen-settings .field { flex: 1 1 180px; }

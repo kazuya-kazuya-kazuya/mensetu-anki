@@ -6,6 +6,31 @@
 
   const STORAGE_KEY_BASE = 'mensetsu-anki:progress:v1';
   const DECK_STORAGE_KEY = 'mensetsu-anki:deck:v1';
+  const REVIEW_KEY = 'mensetsu-anki:review:v1:';
+  const REVIEW_DAYS = [1, 3, 7, 14, 30];
+  let reviews = {};
+  let lastReview = null;
+
+  function loadReviews(deckId) {
+    try {
+      const raw = JSON.parse(localStorage.getItem(REVIEW_KEY + deckId) || '{}');
+      return Object.fromEntries(Object.entries(raw || {}).filter(([, r]) => r && Number.isFinite(r.due) && Number.isInteger(r.step) && r.step >= 0 && r.step <= REVIEW_DAYS.length));
+    } catch (_) { return {}; }
+  }
+
+  function saveReviews() {
+    try { localStorage.setItem(REVIEW_KEY + currentDeck.id, JSON.stringify(reviews)); }
+    catch (_) { document.getElementById('reviewFeedback').textContent = '復習予定を保存できませんでした。この画面では続けられますが、再読み込みすると記録が失われる場合があります。'; }
+  }
+
+  function nextReview(result, previous, now = Date.now()) {
+    if (result === 'again') return { due: now + 10 * 60000, step: 0 };
+    const step = result === 'hard' ? 0 : Math.min(previous?.step || 0, REVIEW_DAYS.length - 1);
+    const date = new Date(now);
+    date.setDate(date.getDate() + (result === 'hard' ? 1 : REVIEW_DAYS[step]));
+    date.setHours(0, 0, 0, 0);
+    return { due: date.getTime(), step: result === 'hard' ? 0 : step + 1 };
+  }
 
   const DECKS = (window.QA_DATA && window.QA_DATA.decks) || [];
 
@@ -94,6 +119,10 @@
     currentDeck = deck;
     loadDeckData(deck);
     progress = loadProgress(deck.id);
+    reviews = loadReviews(deck.id);
+    lastReview = null;
+    btnUndoReview.disabled = true;
+    reviewFeedback.textContent = '';
 
     if (persist) {
       try {
@@ -160,6 +189,7 @@
         p.classList.toggle('is-active', p.dataset.panel === mode);
       });
       if (mode === 'list') renderList();
+      if (mode === 'study' && studyMode.value === 'due') rebuildDeck();
       if (mode === 'unanswered') renderUnanswered();
       if (mode === 'video') renderVideo();
       if (mode === 'listen' && listenUnknown.checked) rebuildListening();
@@ -182,6 +212,11 @@
   const btnResetProgress = document.getElementById('btnResetProgress');
   const btnAgain = document.getElementById('btnAgain');
   const btnKnown = document.getElementById('btnKnown');
+  const btnHard = document.getElementById('btnHard');
+  const studyMode = document.getElementById('studyMode');
+  const reviewSummary = document.getElementById('reviewSummary');
+  const reviewFeedback = document.getElementById('reviewFeedback');
+  const btnUndoReview = document.getElementById('btnUndoReview');
 
   // カテゴリ選択肢を用意（回答が1件も無いカテゴリは暗記対象が無いため注記を付ける）
   function rebuildStudyCategoryOptions() {
@@ -216,7 +251,11 @@
   function rebuildDeck() {
     const pool = poolForFilter(studyState.categoryFilter);
     let filtered = pool;
-    if (studyOnlyUnknown.checked) {
+    studyOnlyUnknown.disabled = studyMode.value === 'due';
+    if (studyMode.value === 'due') {
+      filtered = pool.filter(q => !reviews[q.id] || reviews[q.id].due <= Date.now());
+      filtered.sort((a, b) => (reviews[a.id]?.due ?? Infinity) - (reviews[b.id]?.due ?? Infinity));
+    } else if (studyOnlyUnknown.checked) {
       filtered = filtered.filter((q) => progress[q.id] !== 'known');
     }
     studyState.deck = filtered.map((q) => q.id);
@@ -228,6 +267,19 @@
     const pool = poolForFilter(studyState.categoryFilter);
     const knownCount = pool.filter((q) => progress[q.id] === 'known').length;
     const total = pool.length;
+    const due = pool.filter(q => reviews[q.id] && reviews[q.id].due <= Date.now()).length;
+    const fresh = pool.filter(q => !reviews[q.id]).length;
+    const upcoming = pool.map(q => reviews[q.id]?.due).filter(t => t > Date.now());
+    const next = upcoming.length ? new Date(Math.min(...upcoming)).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+    reviewSummary.textContent = `復習待ち ${due}問 ・ 初回確認 ${fresh}問${next ? ` ・ 次の復習 ${next}` : ''}`;
+    [btnAgain, btnHard, btnKnown].forEach(btn => { btn.disabled = !studyState.flipped; });
+    btnHard.hidden = studyMode.value !== 'due';
+    if (studyState.deck.length) {
+      const planned = nextReview('known', reviews[studyState.deck[0]]);
+      btnAgain.textContent = studyMode.value === 'due' ? '↺ もう一度（10分後）' : '↺ もう一度';
+      btnHard.textContent = '△ あやふや（翌日）';
+      btnKnown.textContent = studyMode.value === 'due' ? `✓ 覚えた（${REVIEW_DAYS[planned.step - 1]}日後）` : '✓ 覚えた';
+    }
     const pct = total === 0 ? 0 : Math.round((knownCount / total) * 100);
     studyProgressFill.style.width = `${pct}%`;
     studyProgressText.textContent = total === 0
@@ -248,7 +300,7 @@
       studyStage.innerHTML = `
         <div class="study-empty">
           <div class="big">🎉</div>
-          <p>このカテゴリの「未暗記」カードはすべて終わりました。<br>お疲れさまでした。</p>
+          <p>${studyMode.value === 'due' ? '今の復習は完了です。次の復習時間になったら、また取り組みましょう。' : '今回のカードはすべて終わりました。お疲れさまでした。'}</p>
         </div>`;
       studyJudge.style.visibility = 'hidden';
       return;
@@ -295,14 +347,23 @@
     studyState.flipped = !studyState.flipped;
     const cardEl = document.getElementById('flashCard');
     if (cardEl) cardEl.classList.toggle('is-flipped', studyState.flipped);
+    [btnAgain, btnHard, btnKnown].forEach(btn => { btn.disabled = !studyState.flipped; });
   }
 
   function judgeCurrent(result) {
-    if (studyState.deck.length === 0) return;
+    if (studyState.deck.length === 0 || !studyState.flipped) return;
+    const currentId = studyState.deck[0];
+    lastReview = { id: currentId, progress: progress[currentId], review: reviews[currentId], deck: [...studyState.deck] };
     const id = studyState.deck.shift();
-    progress[id] = result;
+    progress[id] = result === 'hard' ? 'again' : result;
+    if (studyMode.value === 'due') {
+      reviews[id] = nextReview(result, reviews[id]);
+      reviewFeedback.textContent = `No.${questionById.get(id).no}：次の復習は ${new Date(reviews[id].due).toLocaleString('ja-JP')} です`;
+      saveReviews();
+    } else { reviewFeedback.textContent = '評価を記録しました（復習予定は変更していません）'; }
+    btnUndoReview.disabled = false;
     saveProgress();
-    if (result === 'again') {
+    if (result === 'again' && studyMode.value === 'free') {
       studyState.deck.push(id);
     }
     studyState.flipped = false;
@@ -310,11 +371,39 @@
   }
 
   studyCategorySelect.addEventListener('change', () => {
+    lastReview = null;
+    btnUndoReview.disabled = true;
     studyState.categoryFilter = studyCategorySelect.value;
     rebuildDeck();
   });
 
-  studyOnlyUnknown.addEventListener('change', rebuildDeck);
+  studyOnlyUnknown.addEventListener('change', () => { lastReview = null; btnUndoReview.disabled = true; rebuildDeck(); });
+  studyMode.addEventListener('change', () => {
+    lastReview = null;
+    btnUndoReview.disabled = true;
+    reviewFeedback.textContent = '';
+    rebuildDeck();
+  });
+  btnUndoReview.addEventListener('click', () => {
+    if (!lastReview) return;
+    const { id, progress: oldProgress, review, deck } = lastReview;
+    if (oldProgress === undefined) delete progress[id]; else progress[id] = oldProgress;
+    if (review === undefined) delete reviews[id]; else reviews[id] = review;
+    studyState.deck = deck;
+    studyState.flipped = true;
+    lastReview = null;
+    btnUndoReview.disabled = true;
+    reviewFeedback.textContent = '直前の評価を取り消しました';
+    saveProgress();
+    saveReviews();
+    renderStudy();
+  });
+  setInterval(() => {
+    if (currentDeck && studyMode.value === 'due' && !studyState.deck.length) rebuildDeck();
+  }, 30000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && currentDeck && studyMode.value === 'due') rebuildDeck();
+  });
 
   btnShuffle.addEventListener('click', () => {
     shuffleArray(studyState.deck);
@@ -323,9 +412,14 @@
   });
 
   btnResetProgress.addEventListener('click', () => {
-    const ok = window.confirm(`「${currentDeck.label}」の「覚えた」の記録をすべてリセットします。よろしいですか？`);
+    const ok = window.confirm(`「${currentDeck.label}」の暗記記録と復習予定をすべてリセットします。よろしいですか？`);
     if (!ok) return;
     progress = {};
+    reviews = {};
+    lastReview = null;
+    btnUndoReview.disabled = true;
+    reviewFeedback.textContent = '';
+    saveReviews();
     saveProgress();
     rebuildDeck();
     renderList();
@@ -333,6 +427,7 @@
   });
 
   btnAgain.addEventListener('click', () => judgeCurrent('again'));
+  btnHard.addEventListener('click', () => judgeCurrent('hard'));
   btnKnown.addEventListener('click', () => judgeCurrent('known'));
 
   // ============================================================

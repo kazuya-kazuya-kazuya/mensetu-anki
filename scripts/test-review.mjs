@@ -1,0 +1,77 @@
+import assert from 'node:assert/strict';
+import { chromium } from 'playwright';
+import { mkdirSync } from 'node:fs';
+
+mkdirSync('.vercel', { recursive: true });
+
+const browser = await chromium.launch({ channel: process.env.BROWSER_CHANNEL || 'chrome', headless: true });
+try {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, timezoneId: 'Asia/Tokyo' });
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.clock.install({ time: new Date('2026-09-10T09:00:00+09:00') });
+  await page.goto(process.env.TEST_URL || 'http://localhost:3001');
+  await page.selectOption('#deckSelect', 'accenture-2ji');
+  const ids = await page.evaluate(() => window.QA_DATA.decks.find(d => d.id === 'accenture-2ji').categories.flatMap(c => c.questions.map(q => q.id)));
+  const key = 'mensetsu-anki:review:v1:accenture-2ji';
+  const progressKey = 'mensetsu-anki:progress:v1:accenture-2ji';
+  const records = () => page.evaluate(k => JSON.parse(localStorage.getItem(k) || '{}'), key);
+  const rate = async selector => { await page.click('#flashCard'); await page.click(selector); };
+  assert.equal(await page.locator('#btnKnown').isDisabled(), true);
+  await rate('#btnKnown');
+  let saved = await records();
+  assert.equal(saved[ids[0]].step, 1);
+  assert.equal(saved[ids[0]].due, Date.parse('2026-09-11T00:00:00+09:00'));
+  await page.click('#btnUndoReview');
+  assert.equal((await records())[ids[0]], undefined);
+  await page.click('#btnHard');
+  assert.equal((await records())[ids[0]].step, 0);
+  await rate('#btnAgain');
+  const retry = (await records())[ids[1]].due;
+  assert.ok(Math.abs(retry - (await page.evaluate(() => Date.now())) - 600000) < 2000);
+  await page.reload();
+  assert.ok(!(await page.textContent('#flashCard .flash-no')).endsWith('No.2'));
+  await page.clock.fastForward(601000);
+  await page.click('[data-mode=list]');
+  await page.click('[data-mode=study]');
+  assert.match(await page.locator('#flashCard .flash-no').first().textContent(), /No.2$/);
+  await rate('#btnKnown');
+  await page.clock.fastForward(24 * 60 * 60000);
+  await page.click('[data-mode=list]');
+  await page.click('[data-mode=study]');
+  assert.match(await page.locator('#flashCard .flash-no').first().textContent(), /No.1$/);
+  await rate('#btnKnown');
+  await rate('#btnKnown');
+  assert.equal((await records())[ids[1]].step, 2);
+  assert.equal((await records())[ids[1]].due, Date.parse('2026-09-14T00:00:00+09:00'));
+  const beforeFree = await records();
+  await page.selectOption('#studyMode', 'free');
+  await page.uncheck('#studyOnlyUnknown');
+  await rate('#btnAgain');
+  assert.deepEqual(await records(), beforeFree);
+  await page.selectOption('#deckSelect', 'general');
+  assert.match(await page.textContent('#reviewSummary'), /初回確認/);
+  assert.deepEqual(await records(), beforeFree);
+  // Legacy known flags survive; a review date is deliberately not inferred.
+  await page.evaluate(({ progressKey, key, id }) => { localStorage.removeItem(key); localStorage.setItem(progressKey, JSON.stringify({ [id]: 'known' })); }, { progressKey, key, id: ids[0] });
+  await page.selectOption('#deckSelect', 'accenture-2ji');
+  await page.selectOption('#studyMode', 'due');
+  assert.match(await page.textContent('#studyProgressText'), /覚えた 1/);
+  assert.match(await page.textContent('#reviewSummary'), /初回確認 24/);
+  await page.click('#flashCard');
+  await page.screenshot({ path: '.vercel/review-mobile.png', fullPage: true });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  // All future cards: show completion, then restore due cards automatically.
+  await page.evaluate(({ ids, key }) => { localStorage.setItem(key, JSON.stringify(Object.fromEntries(ids.map(id => [id, {due:Date.now()+60000,step:0}])))); }, { ids, key });
+  await page.reload();
+  assert.equal(await page.locator('#flashCard').count(), 0);
+  await page.clock.fastForward(91000);
+  assert.equal(await page.locator('#flashCard').count(), 1);
+  await page.click('[data-mode=listen]');
+  await page.click('#listenPlay');
+  await page.waitForFunction(() => document.getElementById('listenAudio').currentTime > 0);
+  await page.click('[data-mode=unanswered]');
+  assert.match(await page.textContent('#unansweredSummary'), /未回答/);
+  assert.deepEqual(errors, []);
+  console.log('PASS: due scheduling, interval growth, retry delay, undo, persistence, legacy progress, deck isolation, free practice, mobile layout, listening');
+} finally { await browser.close(); }

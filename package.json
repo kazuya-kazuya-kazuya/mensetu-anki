@@ -5,6 +5,10 @@
     "check": "node scripts/check.mjs",
     "dev": "node scripts/serve.mjs",
     "voicevox:2ji": "node scripts/generate-voicevox-videos.mjs accenture-2ji",
-    "audio:extract": "node scripts/extract-listening-audio.mjs"
+    "audio:extract": "node scripts/extract-listening-audio.mjs",
+    "test:review": "node scripts/test-review.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0"
   }
 }

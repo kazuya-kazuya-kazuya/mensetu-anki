@@ -38,9 +38,13 @@
           <select id="studyCategory"></select>
         </label>
 
+        <label class="field">
+          <span class="field-label">学習方法</span>
+          <select id="studyMode"><option value="due">今日の復習・未学習</option><option value="free">自由に練習</option></select>
+        </label>
         <label class="field field-checkbox">
           <input type="checkbox" id="studyOnlyUnknown" checked />
-          <span>「覚えた」を除いて出題</span>
+          <span>自由練習では「覚えた」を除く</span>
         </label>
 
         <div class="toolbar-buttons">
@@ -50,6 +54,7 @@
       </div>
 
       <div class="study-progress">
+        <p id="reviewSummary" class="review-summary" aria-live="polite"></p>
         <div class="study-progress-bar"><div id="studyProgressFill" class="study-progress-fill"></div></div>
         <p id="studyProgressText" class="study-progress-text"></p>
       </div>
@@ -65,9 +70,13 @@
         <button id="btnKnown" class="btn btn-known" type="button">
           <span class="btn-icon">✓</span>覚えた
         </button>
+        <button id="btnHard" class="btn" type="button">△ あやふや</button>
       </div>
 
-      <p class="hint">カードをタップすると裏返って回答が表示されます</p>
+      <p class="hint">まず答えを声に出して思い出し、カードをタップして答え合わせ。その後で評価してください。</p>
+      <p id="reviewFeedback" role="status"></p>
+      <button id="btnUndoReview" class="btn btn-ghost" type="button" disabled>直前の評価を取り消す</button>
+      <details class="review-help"><summary>復習のしくみ</summary><p>「もう一度」は10分後、「あやふや」は翌日。「覚えた」は1日・3日・7日・14日・30日後と間隔を広げます。復習日が来ると、覚えた問題も再び出題します。以前の記録には復習日がないため、最初に一度確認します。「自由に練習」では復習予定を変えずに練習できます。</p></details>
     </section>
 
     <!-- ===== 一覧モード ===== -->

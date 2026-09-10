@@ -31,6 +31,10 @@ npm.cmd run voicevox:2ji
 
 ## ローカル確認
 
+暗記モードは「今日の復習・未学習」を優先します。回答を表示してから評価すると、もう一度＝10分後、あやふや＝翌日、覚えた＝1・3・7・14・30日後の復習予定を端末内のlocalStorageへ保存します。過去の「覚えた」記録は保持し、復習予定がない問題は初回確認に含めます。「自由に練習」は復習予定を変更しません。直前の評価は取り消せます。
+
+復習機能のブラウザテスト：`npm.cmd ci` 後、`PORT=3001` でローカルサーバーを起動して `npm.cmd run test:review` を実行します。Chromeを使用します（`BROWSER_CHANNEL=msedge` でEdge、`TEST_URL` でテスト先を変更可能）。テストは独立したブラウザ環境で記録を作成し、普段の暗記記録には触れません。
+
 ```powershell
 npm.cmd run check
 npm.cmd run dev
